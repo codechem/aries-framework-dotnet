@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Mail;
 using System.Text;
 using System.Threading.Tasks;
 using Hyperledger.Aries.Configuration;
@@ -15,6 +14,7 @@ using Hyperledger.Indy.DidApi;
 using Hyperledger.Indy.WalletApi;
 using Microsoft.Extensions.Options;
 using Xunit;
+using Hyperledger.Aries.Decorators.Attachments;
 
 namespace Hyperledger.Aries.Tests.Routing
 {
@@ -120,17 +120,19 @@ namespace Hyperledger.Aries.Tests.Routing
         public async Task RestoreAgentFromBackup()
         {
             var seed = "00000000000000000000000000000000";
-            var path = SetupDirectoriesAndReturnPath(seed);
-            
-            await EdgeClient.CreateBackupAsync(EdgeContext, seed);
             // Create a DID that we will retrieve and compare from imported wallet
             var myDid = await Did.CreateAndStoreMyDidAsync(EdgeContext.Wallet, "{}");
-            
-            var attachments = await EdgeClient.RetrieveBackupAsync(RetrieverEdgeContext, seed);
-            await EdgeClient.RestoreFromBackupAsync(RetrieverEdgeContext, seed, attachments,
-                RetrieverAgentOptions.WalletConfiguration.ToJson(), RetrieverAgentOptions.WalletCredentials.ToJson());
-            
-            var myKey = await Did.KeyForLocalDidAsync(RetrieverEdgeContext.Wallet, myDid.Did);
+
+            // Create backup
+            await EdgeClient.CreateBackupAsync(EdgeContext, seed);
+
+            // Retrieve and restore
+            var attachments = await RetrieveEdgeClient.RetrieveBackupAsync(RetrieverEdgeContext, seed);
+            await RetrieveEdgeClient.RestoreFromBackupAsync(RetrieverEdgeContext, seed, attachments);
+
+            // Get new context, to refresh the wallet handle, old one has been disposed
+            var context = await Pair.Agent3.Host.Services.GetRequiredService<IAgentProvider>().GetContextAsync();
+            var myKey = await Did.KeyForLocalDidAsync(context.Wallet, myDid.Did);
             Assert.Equal(myKey, myDid.VerKey);
             
             // TODO: Add response

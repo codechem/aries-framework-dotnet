@@ -71,9 +71,6 @@ namespace Hyperledger.Aries.Agents.Edge
             await recordService.UpdateAsync(agentContext.Wallet, record);
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
-        }
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

@@ -1,4 +1,4 @@
-﻿using Hyperledger.Aries.Agents;
+using Hyperledger.Aries.Agents;
 using Hyperledger.Aries.Decorators.Attachments;
 using Hyperledger.Aries.Extensions;
 using Hyperledger.Aries.Features.IssueCredential;
@@ -11,9 +11,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using Hyperledger.Indy.WalletApi;
 using Newtonsoft.Json;
+using Hyperledger.Aries.Storage;
+using Microsoft.Extensions.Options;
+using Hyperledger.Aries.Configuration;
 
 namespace Hyperledger.Aries.Routing.Edge
 {
+    /// <summary>
+    /// Edge Client Service
+    /// </summary>
+    /// <seealso cref="Hyperledger.Aries.Routing.IEdgeClientService" />
     public partial class EdgeClientService : IEdgeClientService
     {
         /// <inheritdoc />
@@ -24,7 +31,9 @@ namespace Hyperledger.Aries.Routing.Edge
                 throw new ArgumentException($"{nameof(seed)} should be 32 characters");
             }
 
-            var path = Path.Combine(Path.GetTempPath(), seed);
+            var path = Path.GetTempFileName();
+            // Delete 0 byte file created previously
+            File.Delete(path);
 
             var publicKey = await Crypto.CreateKeyAsync(context.Wallet, new {seed}.ToJson());
 
@@ -92,27 +101,24 @@ namespace Hyperledger.Aries.Routing.Edge
         /// <inheritdoc />
         public async Task RestoreFromBackupAsync(IAgentContext edgeContext,
             string seed, 
-            List<Attachment> backupData,
-            string newWalletConfiguration,
-            string newKey)
+            List<Attachment> backupData)
         {
-            var tempWalletPath = Path.Combine(Path.GetTempPath(), seed);
+            var temp = Path.GetTempFileName();
+
             var walletBase64 = backupData.First().Data.Base64;
             var walletToRestoreInBytes = walletBase64.GetBytesFromBase64();
-            
-            await Task.Run(() => File.WriteAllBytes(tempWalletPath, walletToRestoreInBytes));
-            
-            var json = new { path = tempWalletPath, key = seed }.ToJson();
 
-            var conf = new { id = newWalletConfiguration }.ToJson();
-            var key = new { key = newKey }.ToJson();
-            
-            var oldConf = JsonConvert.SerializeObject(_agentOptions.WalletConfiguration);
-            var oldCred = JsonConvert.SerializeObject(_agentOptions.WalletCredentials);
+            await walletService.DeleteWalletAsync(
+                configuration: _agentOptions.WalletConfiguration,
+                credentials: _agentOptions.WalletCredentials);
 
-            await Wallet.ImportAsync(conf, key, json);
-            await edgeContext.Wallet.CloseAsync();
-            await Wallet.DeleteWalletAsync(oldConf, oldCred); //TODO: throws Hyperledger.Indy.InvalidStateException: The SDK library experienced an unexpected internal error.
+            await Task.Run(() => File.WriteAllBytes(temp, walletToRestoreInBytes));
+
+            var json = new { path = temp, key = seed }.ToJson();
+            await Wallet.ImportAsync(
+                config: _agentOptions.WalletConfiguration.ToJson(),
+                credentials: _agentOptions.WalletCredentials.ToJson(),
+                importConfig: json);
         }
 
         /// <inheritdoc />

@@ -24,6 +24,7 @@ namespace Hyperledger.Aries.Routing.Edge
         private const string MediatorConnectionIdTagName = "MediatorConnectionId";
         private readonly IHttpClientFactory httpClientFactory;
         private readonly IProvisioningService provisioningService;
+        private readonly IWalletService walletService;
         private readonly IWalletRecordService recordService;
         private readonly IMessageService messageService;
         private readonly AgentOptions _agentOptions;
@@ -31,12 +32,14 @@ namespace Hyperledger.Aries.Routing.Edge
         public EdgeClientService(
             IHttpClientFactory httpClientFactory,
             IProvisioningService provisioningService,
+            IWalletService walletService,
             IWalletRecordService recordService,
             IMessageService messageService,
             IOptions<AgentOptions> agentOptions)
         {
             this.httpClientFactory = httpClientFactory;
             this.provisioningService = provisioningService;
+            this.walletService = walletService;
             this.recordService = recordService;
             this.messageService = messageService;
             _agentOptions = agentOptions.Value;
